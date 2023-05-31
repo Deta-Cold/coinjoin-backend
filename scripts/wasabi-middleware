@@ -1,0 +1,7 @@
+MOUNTED_MIDDLEWARE="/mnt/middleware/WalletWasabi.WabiSabiClientLibrary"
+if [ -f "$MOUNTED_MIDDLEWARE" ]; then
+    echo "Using external middleware binary ${MOUNTED_MIDDLEWARE}"
+    /mnt/middleware/WalletWasabi.WabiSabiClientLibrary &
+else
+    /opt/middleware/WalletWasabi.WabiSabiClientLibrary &
+fi

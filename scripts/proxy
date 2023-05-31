@@ -1,0 +1,153 @@
+#!/usr/bin/python3
+
+from http.server import SimpleHTTPRequestHandler
+from urllib.parse import urlparse
+from socketserver import TCPServer
+import traceback
+import sys
+import requests
+
+LOCALHOST = "127.0.0.1"
+SERVICES = {
+    "/backend": 37127,
+    "/client": 37128,
+}
+
+def replace_html_links(html, base):
+    # replace absolute links and assets (styles, swagger.json etc.)
+    html = html.replace('href="/', 'href="' + base + '/')
+    return html
+
+def get_service(path, referer):
+    host = f"{LOCALHOST}:{SERVICES['/backend']}" # default service
+    service_key = ''
+    for key in SERVICES:
+        search_key = f"{key}/"
+        if (path.startswith(search_key)):
+            host = f"{LOCALHOST}:{SERVICES[key]}"
+            # strip service key from path
+            path = path[len(key):len(path)]
+            service_key = key
+        elif (referer.startswith(search_key)):
+            host = f"{LOCALHOST}:{SERVICES[key]}"
+            service_key = key
+
+    return {
+        "key": service_key,
+        "host": host,
+        "path": path,
+        "url": f"http://{host}{path}"
+    }
+
+# origin is set to the actual machine that made the call not localhost
+def request_headers(host) -> dict:
+    return {
+        "Host": host,
+        "Origin": f"http://{host}",
+    }
+
+def merge_headers(original: dict, override: dict) -> dict:
+    headers = original.copy()
+    headers.update(override)
+    return headers
+
+# Proxy server redirects between running services
+# Purposes:
+# - access to running services on one address
+# - allows preflight OPTIONS requests (browser usage)
+# - override Access-Control-Allow-Origin header (browser usage)
+
+class Server(TCPServer):
+    def __init__(
+        self,
+        server_address,
+        server_port,
+    ):
+        TCPServer.allow_reuse_address = True
+        super().__init__((server_address, server_port), Server.MyHttpRequestHandler)
+
+    def run(self):
+        self.serve_forever()
+
+    class MyHttpRequestHandler(SimpleHTTPRequestHandler):
+
+        def return_error_page(self, error_code, message):
+            self.send_response(error_code)
+            self.send_header("Content-type", "text/html; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(bytes(message, "utf8"))
+
+        def get_service(self):
+            referer = self.headers.get("referer", "")
+            if (referer != ''):
+                referer = urlparse(referer).path
+            return get_service(self.path, referer)
+
+        def send_response_headers(self, headers):
+            self.send_header("Content-Type", headers.get("Content-Type", ""))
+            # add access and encoding headers only if Origin is present in request headers (browser request)
+            origin = self.headers.get("Origin", "")
+            if (origin != ''):
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.send_header("Content-Encoding", headers.get("Content-Encoding", ""))
+
+        def do_GET(self):
+            try:
+                service = self.get_service()
+                print("do_GET:")
+                print(service)
+                headers = merge_headers(dict(self.headers), request_headers(service['host']))
+
+                resp = requests.get(url=service['url'], headers=headers)
+                self.send_response(resp.status_code)
+                self.send_response_headers(resp.headers)
+                self.end_headers()
+
+                if (resp.status_code == 200 and resp.headers["Content-Type"].find("text/html") >= 0):
+                    content = replace_html_links(resp.text, service['key'])
+                    self.wfile.write(str.encode(content))
+                else:
+                    self.wfile.write(resp.content)
+
+            except Exception:
+                exc_type, exc_value, exc_tb = sys.exc_info()
+                message = "<br>".join(
+                    traceback.format_exception(exc_type, exc_value, exc_tb)
+                )
+                self.return_error_page(500, message)
+
+        def do_POST(self, body: bool = True) -> None:
+            try:
+                data_len = int(self.headers.get("Content-Length", 0))
+                data = self.rfile.read(data_len)
+                service = self.get_service()
+                print("do_POST:")
+                print(service)
+                headers = merge_headers(dict(self.headers), request_headers(service['host']))
+                resp = requests.post(url=service['url'], data=data, headers=headers)
+
+                self.send_response(resp.status_code)
+                self.send_response_headers(resp.headers)
+                self.end_headers()
+                if body:
+                    self.wfile.write(resp.content)
+            except Exception as e:
+                exc_type, exc_value, exc_tb = sys.exc_info()
+                message = traceback.format_exception(exc_type, exc_value, exc_tb)
+                print(message)
+                self.send_error(404, f"Error processing POST: {self.path} Error: {e}")
+
+        def do_OPTIONS(self):
+            self.send_response(200, 'ok')
+            self.send_header('Access-Control-Allow-Origin', self.headers.get('Access-Control-Allow-Origin', '*'))
+            self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+            self.send_header("Access-Control-Allow-Headers", "X-Requested-With")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type")
+            self.end_headers()
+
+server = Server(
+    server_address="0.0.0.0",
+    server_port=8081,
+)
+
+server.run()
