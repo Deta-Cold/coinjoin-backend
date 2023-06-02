@@ -1,4 +1,4 @@
-# coinjoin-backend
+# deta coinjoin-backend
 Docker image running multiple services: bitcoind, blockbook, wasabi-wallet and wasabi-backend
 
 ## Building
