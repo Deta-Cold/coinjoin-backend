@@ -22,8 +22,8 @@ jobs:
         uses: docker/login-action@v2
         with:
           registry: ghcr.io
-          username: ${{ secrets.TREZOR_BOT_USERNAME }}
-          password: ${{ secrets.TREZOR_BOT_TOKEN }}
+          username: ${{ secrets.deta_BOT_USERNAME }}
+          password: ${{ secrets.deta_BOT_TOKEN }}
       - name: Build and push coinjoin-backend
         uses: docker/build-push-action@v2
         with:

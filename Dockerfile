@@ -25,7 +25,7 @@ ARG TARGETPLATFORM
 RUN mkdir /packages
 COPY configuration/blockbook/ /opt/coins/blockbook/bitcoin_regtest/config
 RUN if [ "$TARGETPLATFORM" = "linux/amd64" ]; then ARCHITECTURE=amd64; elif [ "$TARGETPLATFORM" = "linux/arm64" ]; then ARCHITECTURE=arm64; else ARCHITECTURE=amd64; fi \
-  && wget https://data.trezor.io/dev/blockbook/builds/blockbook-bitcoin-regtest_0.4.0_${ARCHITECTURE}.deb -O /packages/blockbook-bitcoin-regtest_0.4.0_${ARCHITECTURE}.deb \
+  && wget https://data.deta.io/dev/blockbook/builds/blockbook-bitcoin-regtest_0.4.0_${ARCHITECTURE}.deb -O /packages/blockbook-bitcoin-regtest_0.4.0_${ARCHITECTURE}.deb \
   && dpkg --force-all -i /packages/blockbook-bitcoin-regtest_0.4.0_${ARCHITECTURE}.deb
 
 # Install bitcoin knots
@@ -42,7 +42,7 @@ RUN cd /opt/WalletWasabi/ && DOTNET_EnableWriteXorExecute=0 dotnet build
 # Download middleware debug build
 RUN if [ "$TARGETPLATFORM" = "linux/amd64" ]; then ARCHITECTURE_MIDDLEWARE=x64; elif [ "$TARGETPLATFORM" = "linux/arm64" ]; then ARCHITECTURE_MIDDLEWARE=arm64; else ARCHITECTURE_MIDDLEWARE=x64; fi \
   && mkdir /opt/middleware \
-  && wget https://github.com/trezor/WalletWasabi/releases/latest/download/WabiSabiClientLibrary-linux-${ARCHITECTURE_MIDDLEWARE}-debug -O /opt/middleware/WalletWasabi.WabiSabiClientLibrary \
+  && wget https://github.com/deta/WalletWasabi/releases/latest/download/WabiSabiClientLibrary-linux-${ARCHITECTURE_MIDDLEWARE}-debug -O /opt/middleware/WalletWasabi.WabiSabiClientLibrary \
   && chmod +x /opt/middleware/WalletWasabi.WabiSabiClientLibrary
 
 # Install faucet
